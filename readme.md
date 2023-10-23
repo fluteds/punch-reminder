@@ -16,10 +16,18 @@ Create a `config.json` file with the following keys:
 - `timezone`: The timezone of your calendar. EG. [Europe/London](https://timezonedb.com/time-zones)
 - `bark_api_key`: API key from [bark.day.app.](https://github.com/Finb/Bark/blob/master/README.en.md)
 
+### Opening an App
+
+Bark has the ability to open a url when you press a notification. This can be used to open app via opening a shortcut (like deeplinking.)
+
+To set up the shortcut url:
+
+- Create an iOS "Open App" Shortcut called "Dayforce" or whatever app you want to open with no spaces. If you change the name of the shortcut, also change it in the `"url": "shortcuts://run-shortcut?name=Dayforce"` If you don't want to create a shortcut, remove the url line.
+
 ## Running
 
 Note: Running the script once a day should be plenty unless you know the events update more often. Your device must also have an active internet connection to recieve the notifcations.
 
-- Run `punch.py`.
+- Run `punch.py`
 
 The script closes itself once all the notifications for the event have been sent.

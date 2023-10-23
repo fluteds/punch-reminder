@@ -1,13 +1,14 @@
+# TODO
+# Refresh events periodically incase of changes
+
 import requests
 import json
 from datetime import datetime, timedelta
 from pytz import timezone
 from icalendar import Calendar, Event
 import time
-import sys
 
 log_prefix = "[" + datetime.now().strftime("%I:%M %p") + "]"
-
 
 def load_config():
     with open("config.json", "r") as f:
@@ -26,64 +27,61 @@ def send_notification(title, message):
                 "title": title,
                 "body": message,
                 "sound": "alarm",
-                "automaticallyCopy": True,
-                "copy": message
+                "url": "shortcuts://run-shortcut?name=Dayforce",
+                "level": "timeSensitive",
+                "group": "Punch Reminders",
+                "automaticallyCopy": "1"
             })
         )
-        print(log_prefix + 'Notification sent! Response HTTP Status Code: {status_code}'.format(
-            status_code=response.status_code))
+        print(log_prefix + f'Notification sent! Response HTTP Status Code: {response.status_code}')
     except requests.exceptions.RequestException:
-        print(log_prefix + ' Notification failed to send')
+        print(log_prefix + f'Notification failed to send. Response HTTP Status Code: {response.status_code}')
 
 def main():
     config = load_config()
-    # Fetch today's events from the internet calendar
     response = requests.get(config["calendar_url"])
     cal = Calendar.from_ical(response.text)
-    tz = timezone(config["timezone"])
+    tz = timezone(config["timezone"])  # Use the timezone from the config
     today = datetime.now(tz).date()
-    
-    print(log_prefix + " Pulling events from calendar.")
-
-    #print(f"Current time in {tz.zone}: {datetime.now()}")
+    events_today = False  # Flag to check if there are any events for today to stop multiple logs
 
     for component in cal.walk():
         if component.name == "VEVENT":
             event = Event.from_ical(component.to_ical())
             start_utc = event["DTSTART"].dt
             end_utc = event["DTEND"].dt
-            start_time = start_utc.astimezone(tz)
-            end_time = end_utc.astimezone(tz)
+            start = start_utc.astimezone(tz)
+            end = end_utc.astimezone(tz)
 
-            if start_time.date() == today:
+            if start.date() == today:
+                events_today = True  # There is an event for today
                 print()
                 print("EVENTS FOR TODAY")
                 print()
-                print(f"{event['SUMMARY']} - Start Time: {start_time} - End Time: {end_time}")
+                print(f"{event['SUMMARY']} - Start: {start.strftime('%H:%M')} - End: {end.strftime('%H:%M')}")
                 print()
-                
-            if not start_time.date() == today:
-                print(log_prefix + " There is not an event scheduled for today.")                
-                
+
                 # Notify 5 mins before the event
-                notify_time = start_time - timedelta(minutes=5)
+                notify_time = start - timedelta(minutes=5)
                 if notify_time > datetime.now(tz):
                     notify_title = f"PUNCH IN" #{event['SUMMARY']}"
-                    notify_message = f"Don't forget to punch in for {event['SUMMARY']} at {start_time.strftime('%I:%M %p')}"
+                    notify_message = f"Don't forget to punch in for {event['SUMMARY']} at {start.strftime('%H:%M')}"
                     wait_time = (notify_time - datetime.now(tz)).total_seconds()
                     time.sleep(wait_time)
                     send_notification(notify_title, notify_message)
-                    print(log_prefix + " Notification sent for start_time time: {notify_time}")
+                    print(f"Notification sent for start time: {notify_time}")
 
-                # Notify 5 mins before the end_time of the event
-                notify_time = end_time - timedelta(minutes=5)
+                # Notify 5 mins before the end of the event
+                notify_time = end - timedelta(minutes=5)
                 if notify_time > datetime.now(tz):
                     notify_title = f"PUNCH OUT" #{event['SUMMARY']}"
-                    notify_message = f"{event['SUMMARY']} ends at {end_time.strftime('%I:%M %p')}"
+                    notify_message = f"{event['SUMMARY']} ends at {end.strftime('%H:%M')}"
                     wait_time = (notify_time - datetime.now(tz)).total_seconds()
                     time.sleep(wait_time)
                     send_notification(notify_title, notify_message)
-                    print(log_prefix + " Notification sent for end_time time: {notify_time}")
+                    print(f"Notification sent for end time: {notify_time}")
+    if not events_today:
+        print("No events for today.")  # Add a console log if there are no events
 
 if __name__ == "__main__":
     main()
